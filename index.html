@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ระบบเช็คชื่อนักเรียน PKW</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Modernized Palette */
+            --bg-color: #f4f7fa;
+            --white: #ffffff;
+            --pkw-green: #34c759;
+            --pkw-blue: #007aff;
+            --pkw-yellow: #ff9500;
+            --pkw-red: #ff3b30;
+            --pkw-red-soft: #fff1f0;
+            --pkw-red-border: #ffccc7;
+            --text-dark: #1c1c1e;
+            --text-gray: #6e6e73;
+            --border-gray: #e5e5ea;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- Icons --- */
+        .icon { width: 20px; height: 20px; vertical-align: middle; fill: currentColor; }
+        .icon-sm { width: 16px; height: 16px; }
+
+        /* --- Header & Navigation --- */
+        .header { background: var(--white); padding: 16px; border-bottom: 1px solid var(--border-gray); }
+        .mode-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .mode-btn {
+            padding: 12px; border-radius: 14px; text-align: center; font-size: 0.95rem; font-weight: 500;
+            background: var(--white); border: 1.5px solid var(--border-gray); color: #555; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .mode-btn.active { color: white; border-color: transparent; font-weight: 600; transform: scale(1.02); }
+        .mode-btn[data-mode="present"].active { background: var(--pkw-green); }
+        .mode-btn[data-mode="checkin"].active { background: var(--pkw-blue); }
+        .mode-btn[data-mode="leave"].active { background: var(--pkw-yellow); }
+        .mode-btn[data-mode="missing"].active { background: var(--pkw-red); }
+
+        /* --- Content Area --- */
+        .content-view { flex: 1; overflow-y: auto; padding: 16px; display: none; }
+        .content-view.active { display: block; }
+
+        .attendance-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding-bottom: 40px; }
+        .student-box {
+            aspect-ratio: 1/1.15; background: var(--white); border-radius: 18px; display: flex;
+            flex-direction: column; align-items: center; justify-content: center; border: 1.5px solid var(--border-gray);
+            transition: all 0.1s; box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        }
+        .student-box:active { transform: scale(0.92); }
+        .student-box.present { background: var(--pkw-green); color: white; border-color: transparent; }
+        .student-box.leave { background: var(--pkw-yellow); color: white; border-color: transparent; }
+        .student-box.checkin { background: var(--pkw-blue); color: white; border-color: transparent; }
+        .student-box.missing { background: var(--pkw-red); color: white; border-color: transparent; }
+        .std-num { font-size: 1.4rem; font-weight: 700; }
+        .std-name { font-size: 0.75rem; opacity: 0.9; margin-top: 2px; }
+
+        /* --- Settings View --- */
+        .settings-card { background: white; border-radius: 28px; padding: 24px; height: 100%; display: flex; flex-direction: column; }
+        .settings-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .textarea-large {
+            flex: 1; width: 100%; padding: 20px; border-radius: 20px; border: 1.5px solid var(--border-gray);
+            font-family: 'Kanit'; font-size: 1.05rem; background: #fafafa; resize: none; outline: none; transition: border-color 0.2s;
+        }
+        .textarea-large:focus { border-color: var(--pkw-blue); background: white; }
+        .settings-actions { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+        
+        .btn-action {
+            height: 60px; border-radius: 18px; border: none; font-family: 'Kanit'; font-weight: 600; font-size: 1.1rem;
+            display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-save-blue { background: #0056d2; color: white; box-shadow: 0 6px 15px rgba(0, 86, 210, 0.25); }
+        .btn-save-blue:active { transform: scale(0.97); }
+        .btn-cancel-gray { background: #f2f2f7; color: #555; }
+
+        /* --- Updated Summary View --- */
+        #summaryPage { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: #f8f9fb; z-index: 1000; display: none; flex-direction: column; 
+        }
+        .sum-header { padding: 24px 20px 10px; text-align: center; }
+        .sum-header h2 { font-size: 1.2rem; font-weight: 700; }
+        .sum-header p { font-size: 0.9rem; color: var(--text-gray); margin-top: 4px; }
+
+        .sum-scroll { flex: 1; overflow-y: auto; padding: 20px; }
+        
+        .present-card {
+            background: #eaffea; border-radius: 22px; padding: 22px; margin-bottom: 20px;
+            display: flex; justify-content: space-between; align-items: center; color: #155724;
+        }
+        .present-card .label { font-weight: 700; font-size: 1.05rem; }
+        .present-card .count { font-size: 1.8rem; font-weight: 800; }
+        .present-card .count small { font-size: 0.9rem; font-weight: 400; margin-left: 4px; }
+
+        .red-group-container {
+            background: var(--pkw-red-soft); border: 1.5px solid var(--pkw-red-border);
+            border-radius: 28px; padding: 20px; margin-bottom: 20px;
+        }
+        .notice-text {
+            color: #cf1322; font-weight: 700; font-size: 0.95rem; margin-bottom: 16px;
+            display: flex; gap: 8px; line-height: 1.4;
+        }
+
+        .category-card { 
+            background: white; border-radius: 20px; padding: 18px; margin-bottom: 12px; 
+            border: 1px solid rgba(0,0,0,0.05); position: relative;
+        }
+        .category-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .category-label { font-weight: 700; font-size: 1rem; border-left: 4px solid currentColor; padding-left: 10px; }
+        .category-count { font-size: 0.85rem; background: #f0f0f0; padding: 4px 10px; border-radius: 12px; font-weight: 700; }
+
+        .summary-list { font-size: 0.95rem; color: #333; }
+        .summary-item { padding: 4px 0; border-bottom: 1px solid #f9f9f9; }
+        .summary-note { color: #888; font-size: 0.8rem; margin-left: 5px; }
+
+        /* Summary Footer with 3 Buttons */
+        .summary-footer { 
+            display: grid; grid-template-columns: 1fr 1.8fr 1fr; gap: 10px; 
+            padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: white; 
+            border-top: 1px solid var(--border-gray);
+        }
+        .btn-sum { 
+            height: 54px; border-radius: 16px; border: none; font-family: 'Kanit'; 
+            font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; 
+            justify-content: center; gap: 6px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-sum:active { transform: scale(0.96); }
+        .btn-sum-gray { background: #f2f2f7; color: #333; }
+        .btn-sum-primary { background: #eef2ff; color: #4338ca; }
+        .btn-sum-danger { background: #fff1f0; color: #ff3b30; border: 1px solid #ffccc7; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; z-index: 2000; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); align-items: center; justify-content: center; padding: 24px; }
+        .modal-box { background: white; padding: 28px; border-radius: 30px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+        .modal-input { width: 100%; padding: 16px; border: 2px solid var(--border-gray); border-radius: 16px; margin: 20px 0; font-family: 'Kanit'; text-align: center; outline: none; font-size: 1.1rem; }
+        
+        /* Main Navigation Footer */
+        .main-footer {
+            background: var(--white); border-top: 1px solid var(--border-gray);
+            padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); display: flex; gap: 14px;
+        }
+        .btn-icon-bg { width: 60px; height: 60px; background: #f2f2f7; border: none; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #555; }
+        .btn-main-action { flex: 1; height: 60px; background: var(--pkw-blue); color: white; border: none; border-radius: 20px; font-family: 'Kanit'; font-weight: 600; font-size: 1.15rem; box-shadow: 0 5px 15px rgba(0, 122, 255, 0.3); }
+
+        .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #bbb; padding: 40px; }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <div class="header" id="nav-header" style="display:none;">
+        <div class="mode-grid">
+            <div class="mode-btn active" data-mode="present" onclick="setMode('present')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                ลงแถว
+            </div>
+            <div class="mode-btn" data-mode="checkin" onclick="setMode('checkin')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                แจ้งเข้า รร.
+            </div>
+            <div class="mode-btn" data-mode="leave" onclick="setMode('leave')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg>
+                ลา
+            </div>
+            <div class="mode-btn" data-mode="missing" onclick="setMode('missing')">
+                <svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                ติดต่อไม่ได้
+            </div>
+        </div>
+    </div>
+
+    <!-- Main View -->
+    <div id="main-view" class="content-view active">
+        <div id="empty-state" class="empty-state">
+            <svg style="width:64px; height:64px; margin-bottom:16px; opacity:0.3;" viewBox="0 0 24 24"><path fill="currentColor" d="M19,3H5C3.89,3 3,3.9 3,5V19C3,20.1 3.89,21 5,21H19C20.1,21 21,20.1 21,19V5C21,3.9 20.1,3 19,3M19,19H5V5H19V19M7,10H17V12H7V10M7,14H12V16H7V14M7,6H17V8H7V6Z"/></svg>
+            <h3 style="color:#555;">ยังไม่มีรายชื่อนักเรียน</h3>
+            <p style="font-size:0.9rem; margin-top:8px;">เพิ่มข้อมูลเพื่อเริ่มใช้งาน</p>
+            <button class="btn-action btn-save-blue" style="margin-top:24px; padding:0 32px; height:50px; font-size:1rem;" onclick="toggleSettings()">เพิ่มรายชื่อ</button>
+        </div>
+        <div class="attendance-grid" id="grid"></div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settings-view" class="content-view">
+        <div class="settings-card">
+            <div class="settings-title">
+                <svg class="icon" style="color:var(--pkw-blue);" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                จัดการรายชื่อนักเรียน
+            </div>
+            <textarea id="studentInput" class="textarea-large" placeholder="ตัวอย่างการพิมพ์ที่ถูกต้อง:&#10;1 สมชาย ใจดี&#10;2 สมหญิง รักเรียน"></textarea>
+            <div class="settings-actions">
+                <button class="btn-action btn-save-blue" onclick="saveStudents()">บันทึกรายชื่อ</button>
+                <button class="btn-action btn-cancel-gray" onclick="closeSettings()">ยกเลิกการแก้ไข</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Main -->
+    <div class="main-footer" id="main-footer" style="display:none;">
+        <button class="btn-icon-bg" onclick="toggleSettings()">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+        </button>
+        <button class="btn-main-action" onclick="showSummary()">
+            สรุปข้อมูล
+        </button>
+    </div>
+
+    <!-- Summary Page -->
+    <div id="summaryPage">
+        <div class="sum-header">
+            <h2>รายงานการเช็คชื่อ</h2>
+            <p id="sumDate"></p>
+        </div>
+        
+        <div class="sum-scroll" id="sumScrollContent"></div>
+
+        <div class="summary-footer">
+            <button class="btn-sum btn-sum-gray" onclick="closeSummary()">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                กลับ
+            </button>
+            <button id="copyBtn" class="btn-sum btn-sum-primary" onclick="copyToClipboard()">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                คัดลอกข้อมูล
+            </button>
+            <button class="btn-sum btn-sum-danger" onclick="confirmReset()">
+                <svg class="icon-sm" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                เริ่มใหม่
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="reasonModal" class="modal">
+        <div class="modal-box">
+            <h4 id="reasonTitle" style="font-size:1.3rem;">ระบุรายละเอียด</h4>
+            <input type="text" id="reasonInput" class="modal-input" placeholder="นร. แจ้งว่า...">
+            <button class="btn-action btn-save-blue" style="width:100%; height:54px;" onclick="confirmReason()">ตกลง</button>
+            <button class="btn-action btn-cancel-gray" style="width:100%; height:54px; margin-top:10px;" onclick="closeModal()">ยกเลิก</button>
+        </div>
+    </div>
+
+    <!-- Reset Confirm Modal -->
+    <div id="resetModal" class="modal">
+        <div class="modal-box">
+            <h4 style="font-size:1.3rem; color:var(--pkw-red);">ยืนยันการเริ่มใหม่?</h4>
+            <p style="margin-top:10px; color:#666;">ข้อมูลการเช็คชื่อปัจจุบันจะถูกล้างทั้งหมด</p>
+            <button class="btn-action btn-save-blue" style="width:100%; height:54px; background:var(--pkw-red); margin-top:20px;" onclick="doReset()">ใช่, เริ่มใหม่</button>
+            <button class="btn-action btn-cancel-gray" style="width:100%; height:54px; margin-top:10px;" onclick="document.getElementById('resetModal').style.display='none'">ยังก่อน</button>
+        </div>
+    </div>
+
+    <script>
+        let students = [];
+        let attendance = {};
+        let reasons = {};
+        let currentMode = 'present';
+        let pendingId = null;
+
+        window.onload = () => {
+            const saved = localStorage.getItem('pkw_students_v7');
+            if (saved) {
+                students = JSON.parse(saved);
+                document.getElementById('studentInput').value = students.map(s => `${s.id} ${s.name}`).join('\n');
+            }
+            updateUI();
+        };
+
+        function updateUI() {
+            const hasData = students.length > 0;
+            document.getElementById('nav-header').style.display = hasData ? 'block' : 'none';
+            document.getElementById('main-footer').style.display = hasData ? 'flex' : 'none';
+            document.getElementById('empty-state').style.display = hasData ? 'none' : 'flex';
+            if (hasData) renderGrid();
+        }
+
+        function renderGrid() {
+            const grid = document.getElementById('grid');
+            grid.innerHTML = "";
+            students.forEach(s => {
+                const box = document.createElement('div');
+                box.className = `student-box ${attendance[s.id] || ''}`;
+                box.innerHTML = `<span class="std-num">${s.id}</span><span class="std-name">${s.name.split(' ')[0]}</span>`;
+                box.onclick = () => markStudent(s.id);
+                grid.appendChild(box);
+            });
+        }
+
+        function markStudent(id) {
+            if (attendance[id]) {
+                delete attendance[id];
+                delete reasons[id];
+            } else {
+                if (currentMode === 'checkin') {
+                    pendingId = id;
+                    document.getElementById('reasonTitle').innerText = students.find(s=>s.id==id).name;
+                    document.getElementById('reasonModal').style.display = 'flex';
+                    document.getElementById('reasonInput').focus();
+                    return;
+                }
+                attendance[id] = currentMode;
+            }
+            renderGrid();
+        }
+
+        function confirmReason() {
+            const r = document.getElementById('reasonInput').value.trim() || "ไม่ระบุ";
+            reasons[pendingId] = r;
+            attendance[pendingId] = 'checkin';
+            closeModal();
+            renderGrid();
+        }
+
+        function closeModal() { document.getElementById('reasonModal').style.display = 'none'; document.getElementById('reasonInput').value = ""; }
+        
+        function setMode(m) {
+            currentMode = m;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+        }
+
+        function toggleSettings() {
+            document.getElementById('settings-view').classList.add('active');
+            document.getElementById('main-view').classList.remove('active');
+            document.getElementById('main-footer').style.display = 'none';
+            document.getElementById('nav-header').style.display = 'none';
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-view').classList.remove('active');
+            document.getElementById('main-view').classList.add('active');
+            updateUI();
+        }
+
+        function saveStudents() {
+            const val = document.getElementById('studentInput').value.trim();
+            students = val.split('\n').filter(l => l.trim()).map(line => {
+                const parts = line.trim().split(/\s+/);
+                return { id: parts[0], name: parts.slice(1).join(' ') };
+            });
+            localStorage.setItem('pkw_students_v7', JSON.stringify(students));
+            closeSettings();
+        }
+
+        function showSummary() {
+            const now = new Date();
+            const weekday = now.toLocaleDateString('th-TH', { weekday: 'long' }).replace('วัน', '');
+            const dateStr = `${weekday}ที่ ${now.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })} | ${now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+            document.getElementById('sumDate').innerText = dateStr;
+
+            const stats = { present: 0, checkin: [], leave: [], missing: [] };
+            students.forEach(s => {
+                const st = attendance[s.id];
+                if (st === 'present') stats.present++;
+                else if (st) stats[st].push({ ...s, note: reasons[s.id] });
+            });
+
+            const scroll = document.getElementById('sumScrollContent');
+            scroll.innerHTML = `
+                <div class="present-card">
+                    <span class="label">ลงแถว</span>
+                    <span class="count">${stats.present} <small>คน</small></span>
+                </div>
+
+                <div class="red-group-container">
+                    <div class="notice-text">
+                        <svg class="icon" style="flex-shrink:0; margin-top:2px;" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                        <span>"รายชื่อ นร. ต่อไปนี้ ผู้ปกครองต้องโทรหา นร. เพื่อยืนยันข้อมูลกับครู"</span>
+                    </div>
+
+                    ${renderCategoryCard('ลา', stats.leave, 'var(--pkw-yellow)')}
+                    ${renderCategoryCard('แจ้งเข้า รร. แต่ไม่ขอลงแถว', stats.checkin, 'var(--pkw-blue)', true)}
+                    ${renderCategoryCard('ติดต่อไม่ได้', stats.missing, 'var(--pkw-red)')}
+                </div>
+            `;
+
+            document.getElementById('summaryPage').style.display = 'flex';
+        }
+
+        function renderCategoryCard(label, list, color, isCheckin = false) {
+            return `
+                <div class="category-card">
+                    <div class="category-header">
+                        <span class="category-label" style="color:${color}">${label}</span>
+                        <span class="category-count">${list.length} คน</span>
+                    </div>
+                    <div class="summary-list">
+                        ${list.map(s => `
+                            <div class="summary-item">
+                                ${s.id}. ${s.name} ${isCheckin ? `<span class="summary-note">(นร.แจ้งว่า: ${s.note})</span>` : ''}
+                            </div>
+                        `).join('') || '<div style="color:#bbb; font-size:0.85rem;">- ไม่มีข้อมูล -</div>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        function closeSummary() { document.getElementById('summaryPage').style.display = 'none'; }
+
+        function confirmReset() { document.getElementById('resetModal').style.display = 'flex'; }
+        
+        function doReset() {
+            attendance = {};
+            reasons = {};
+            document.getElementById('resetModal').style.display = 'none';
+            closeSummary();
+            renderGrid();
+        }
+
+        function copyToClipboard() {
+            let stats = { present: 0, checkin: [], leave: [], missing: [] };
+            students.forEach(s => {
+                const st = attendance[s.id];
+                if (st === 'present') stats.present++;
+                else if (st) stats[st].push({ ...s, note: reasons[s.id] });
+            });
+
+            let text = `📝 รายงานการเช็คชื่อ\n${document.getElementById('sumDate').innerText}\n\n`;
+            text += `✅ ลงแถว: ${stats.present} คน\n\n`;
+            text += `🚨 "รายชื่อ นร. ต่อไปนี้ ผู้ปกครองต้องโทรหา นร. เพื่อยืนยันข้อมูลกับครู"\n\n`;
+            text += `[ลา] (${stats.leave.length} คน):\n` + (stats.leave.map(s => `- ${s.id}. ${s.name}`).join('\n') || '-');
+            text += `\n\n[แจ้งเข้า] (${stats.checkin.length} คน):\n` + (stats.checkin.map(s => `- ${s.id}. ${s.name} (${s.note})`).join('\n') || '-');
+            text += `\n\n[ติดต่อไม่ได้] (${stats.missing.length} คน):\n` + (stats.missing.map(s => `- ${s.id}. ${s.name}`).join('\n') || '-');
+
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            
+            const btn = document.getElementById('copyBtn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<svg class="icon-sm" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg> คัดลอกสำเร็จ`;
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+            }, 2000);
+        }
+    </script>
+</body>
+</html>
